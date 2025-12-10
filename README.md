@@ -213,10 +213,3 @@ Comprehensive system documentation is available in `docs/projectdocumentation.md
 - **OpenAI API**: LLM for question generation and answers
 - **pytest**: Testing framework
 
-## License
-
-This project is created for the Kasparro AI assignment.
-
-## Author
-
-Jagadeesh - Kasparro AI Agentic Content Generation System Assignment
