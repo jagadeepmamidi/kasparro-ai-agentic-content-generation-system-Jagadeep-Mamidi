@@ -1,44 +1,48 @@
-# Kasparro AI Agentic Content Generation System
+# Kasparro AI Agentic Content Generation System - LangGraph Edition
 
-A modular, multi-agent automation system that transforms structured product data into machine-readable JSON content pages through orchestrated agent workflows.
+A modular, multi-agent automation system that transforms structured product data into machine-readable JSON content pages through **LangGraph-orchestrated** agent workflows.
 
 ## Project Overview
 
-This system demonstrates engineering-focused automation using a multi-agent architecture. It takes a single product dataset as input and automatically generates three different content pages (FAQ, Product Description, Comparison) in structured JSON format.
+This system demonstrates engineering-focused automation using a **LangGraph-based multi-agent architecture**. It takes a single product dataset as input and automatically generates three different content pages (FAQ, Product Description, Comparison) in structured JSON format.
 
 **Key Features:**
-- 6 Specialized Agents with clear boundaries and responsibilities
-- DAG Orchestration for automated workflow execution
+- **LangGraph Framework** for graph-based workflow orchestration
+- 7 Specialized Agents with clear boundaries and responsibilities
+- **LLM-Generated Competitor Products** (no hardcoded data)
+- State Graph Orchestration with error handling and retry logic
 - 8 Reusable Content Logic Blocks for modular content generation
 - 3 Custom Templates (FAQ, Product, Comparison)
 - Pydantic Schemas for data validation
+- **Batched LLM Calls** for efficiency
+- Comprehensive Test Suite with mocked LLM responses
 - Machine-Readable JSON Output
 
 ## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    OrchestratorAgent                        │
-│                  (Pipeline Coordinator)                     │
+│              LangGraph Orchestrator (StateGraph)            │
+│                  (Graph-based Coordination)                 │
 └──────────────────────┬──────────────────────────────────────┘
                        │
-       ┌───────────────┼───────────────┐
-       │               │               │
-       ▼               ▼               ▼
-┌──────────┐    ┌──────────┐    ┌──────────┐
-│  Data    │    │ Question │    │   Page   │
-│  Parser  │───▶│Generator │───▶│ Assembly │
-│  Agent   │    │  Agent   │    │  Agent   │
-└──────────┘    └──────────┘    └─────┬────┘
-                                      │
-                      ┌───────────────┼───────────────┐
-                      │               │               │
-                      ▼               ▼               ▼
-              ┌──────────┐    ┌──────────┐    ┌──────────┐
-              │ Content  │    │ Template │    │   LLM    │
-              │  Logic   │    │  Engine  │    │(OpenAI)  │
-              │  Engine  │    │          │    │          │
-              └──────────┘    └──────────┘    └──────────┘
+       ┌───────────────┼───────────────┬──────────────┐
+       │               │               │              │
+       ▼               ▼               ▼              ▼
+┌──────────┐    ┌──────────┐    ┌──────────┐  ┌──────────┐
+│  Data    │    │ Product  │    │ Question │  │   Page   │
+│  Parser  │───▶│Generator │───▶│Generator │─▶│ Assembly │
+│  Agent   │    │  Agent   │    │  Agent   │  │  Agent   │
+└──────────┘    └──────────┘    └──────────┘  └─────┬────┘
+                                                     │
+                     ┌───────────────┼───────────────┐
+                     │               │               │
+                     ▼               ▼               ▼
+             ┌──────────┐    ┌──────────┐    ┌──────────┐
+             │ Content  │    │ Template │    │   LLM    │
+             │  Logic   │    │  Engine  │    │(OpenAI)  │
+             │  Engine  │    │          │    │+ Retry   │
+             └──────────┘    └──────────┘    └──────────┘
 ```
 
 ## Project Structure
@@ -48,11 +52,12 @@ kasparro/
 ├── src/
 │   ├── agents/
 │   │   ├── data_parser_agent.py
+│   │   ├── product_generator_agent.py      # NEW: LLM-based competitor generation
 │   │   ├── question_generator_agent.py
 │   │   ├── content_logic_engine.py
 │   │   ├── template_engine.py
 │   │   ├── page_assembly_agent.py
-│   │   └── orchestrator_agent.py
+│   │   └── langgraph_orchestrator.py       # NEW: LangGraph-based orchestration
 │   ├── templates/
 │   │   ├── faq_template.py
 │   │   ├── product_template.py
@@ -68,6 +73,10 @@ kasparro/
 ├── docs/
 │   └── projectdocumentation.md
 ├── tests/
+│   ├── test_schemas.py
+│   ├── test_content_logic.py
+│   ├── test_agents.py                      # NEW: Unit tests with mocked LLM
+│   └── test_pipeline.py                    # NEW: Integration tests
 ├── main.py
 └── requirements.txt
 ```
@@ -91,39 +100,49 @@ kasparro/
    python -m venv venv
    
    # Windows
-   venv\Scripts\activate
+   .\venv\Scripts\activate
    
    # Linux/Mac
    source venv/bin/activate
    ```
 
-3. Install dependencies
+3. Install dependencies (includes LangGraph, LangChain, Tenacity)
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Configure API key
+4. Configure API key and environment variables
    ```bash
    # Copy example env file
    copy .env.example .env
    
    # Edit .env and add your OpenAI API key
    # OPENAI_API_KEY=sk-...
+   # OPENAI_MODEL=gpt-4o-mini  # Optional: override default model
    ```
 
 ## Running the Pipeline
 
+### Basic Usage (Default Product)
 ```bash
 python main.py
 ```
 
+### Advanced Usage (Custom Product Data)
+```bash
+python main.py --product-file path/to/product.json
+```
+
 This will:
-1. Parse the GlowBoost Vitamin C Serum data
-2. Generate 15+ categorized questions
-3. Create FAQ page with Q&A pairs
-4. Create Product page with structured sections
-5. Create Comparison page (GlowBoost vs RadiantGlow)
-6. Output three JSON files to `output/` directory
+1. Parse the input product data (Product A)
+2. **Generate a fictional competitor product (Product B) using LLM**
+3. Generate 15+ categorized questions
+4. Create FAQ page with batched Q&A generation
+5. Create Product page with structured sections
+6. Create Comparison page (Product A vs Product B)
+7. Output three JSON files to `output/` directory
+
+**Note**: Product B is now dynamically generated by an LLM agent based on Product A's characteristics, not hardcoded.
 
 ## Output Examples
 
@@ -183,8 +202,10 @@ This will:
 # Run all tests
 pytest tests/ -v
 
-# Run specific test
-pytest tests/test_agents.py -v
+# Run specific test files
+pytest tests/test_schemas.py -v
+pytest tests/test_agents.py -v        # Unit tests with mocked LLM
+pytest tests/test_pipeline.py -v     # Integration tests
 ```
 
 ## Documentation
@@ -209,14 +230,15 @@ Comprehensive system documentation is available in `docs/projectdocumentation.md
 ## Technology Stack
 
 - **Python 3.10+**: Core language
-- **Pydantic**: Data validation and schemas
-- **OpenAI API**: LLM for question generation and answers
-- **pytest**: Testing framework
+- **LangGraph 0.2+**: Graph-based workflow orchestration
+- **LangChain Core 0.3+**: Agent framework foundation
+- **Pydantic 2.9+**: Data validation and schemas
+- **OpenAI API**: LLM for content generation
+- **Tenacity 8.2+**: Retry logic for LLM calls
+- **pytest**: Testing framework with mocking support
 
 ## License
 
 This project is created for the Kasparro AI assignment.
 
-## Author
 
-Jagadeesh - Kasparro AI Agentic Content Generation System Assignment

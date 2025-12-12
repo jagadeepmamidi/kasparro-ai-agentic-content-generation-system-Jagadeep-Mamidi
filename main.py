@@ -1,25 +1,41 @@
 """Main entry point for the Kasparro AI Agentic Content Generation System.
 
-This script demonstrates the multi-agent pipeline that generates structured
-JSON content pages from product data.
+This script demonstrates the LangGraph-based multi-agent pipeline that generates
+structured JSON content pages from product data.
 """
 
 import sys
+import argparse
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.agents.orchestrator_agent import OrchestratorAgent
-from src.utils import setup_logging
+from src.agents.langgraph_orchestrator import LangGraphOrchestrator
+from src.utils import configure_logging, get_logger
 
-logger = setup_logging(__name__)
+# Configure logging once at startup
+configure_logging()
+logger = get_logger(__name__)
 
 
-def main():
-    """Run the content generation pipeline."""
+def load_product_data(args) -> dict:
+    """Load product data based on command-line arguments.
     
-    # GlowBoost Vitamin C Serum - The only factual input
-    glowboost_data = {
+    Args:
+        args: Parsed command-line arguments
+        
+    Returns:
+        Product data dictionary
+    """
+    # If product file is specified, load from file
+    if args.product_file:
+        logger.info(f"Loading product data from file: {args.product_file}")
+        with open(args.product_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    
+    # Otherwise, use default GlowBoost product
+    return {
         "product_name": "GlowBoost Vitamin C Serum",
         "concentration": "10% Vitamin C",
         "skin_type": "Oily, Combination",
@@ -29,29 +45,61 @@ def main():
         "side_effects": "Mild tingling for sensitive skin",
         "price": "₹699"
     }
+
+
+def parse_arguments():
+    """Parse command-line arguments.
     
-    logger.info("Initializing Kasparro AI Agentic Content Generation System")
-    logger.info(f"Input Product: {glowboost_data['product_name']}")
+    Returns:
+        Parsed arguments
+    """
+    parser = argparse.ArgumentParser(
+        description="Kasparro AI Agentic Content Generation System - LangGraph Edition"
+    )
+    parser.add_argument(
+        "--product-file",
+        type=str,
+        help="Path to JSON file containing product data"
+    )
+    return parser.parse_args()
+
+
+def main():
+    """Run the LangGraph-based content generation pipeline."""
     
-    orchestrator = OrchestratorAgent()
+    args = parse_arguments()
+    
+    # Load product data
+    product_data = load_product_data(args)
+    
+    logger.info("=" * 70)
+    logger.info("Kasparro AI Agentic Content Generation System - LangGraph Edition")
+    logger.info("=" * 70)
+    logger.info(f"Input Product: {product_data['product_name']}")
+    logger.info(f"Using LangGraph Framework for orchestration")
+    
+    # Initialize LangGraph orchestrator
+    orchestrator = LangGraphOrchestrator()
     
     try:
-        output_files = orchestrator.run_pipeline(glowboost_data)
+        # Execute the pipeline
+        output_files = orchestrator.run_pipeline(product_data)
         
-        print("\n" + "=" * 60)
-        print("SUCCESS! Content generation complete.")
-        print("=" * 60)
+        print("\n" + "=" * 70)
+        print("SUCCESS! LangGraph pipeline completed successfully.")
+        print("=" * 70)
         print("\nGenerated files:")
         for page_type, filepath in output_files.items():
-            print(f"  ✓ {page_type.upper()}: {filepath}")
+            print(f"  {page_type.upper()}: {filepath}")
         print("\nYou can now review the JSON files in the output/ directory.")
-        print("=" * 60)
+        print("=" * 70)
         
     except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
-        logger.exception("Pipeline execution failed")
+        print(f"\nError: {str(e)}")
+        logger.exception("LangGraph pipeline execution failed")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+

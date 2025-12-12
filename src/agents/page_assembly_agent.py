@@ -1,13 +1,14 @@
 """Page Assembly Agent - Assembles final pages from templates and content blocks."""
 
 from typing import Dict, Any, List
-import json
-from openai import OpenAI
+from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+from pydantic import ValidationError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from src.schemas import ProductData, Question, FAQItem
 from src.agents.content_logic_engine import ContentLogicEngine
 from src.agents.template_engine import TemplateEngine
-from src.config import OPENAI_API_KEY, OPENAI_MODEL
+from src.config import OPENAI_API_KEY, OPENAI_MODEL, MAX_RETRIES, RETRY_MIN_WAIT, RETRY_MAX_WAIT
 from src.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -30,7 +31,7 @@ class PageAssemblyAgent:
         logger.info("PageAssemblyAgent initialized")
     
     def assemble_faq_page(self, product: ProductData, questions: List[Question]) -> Dict[str, Any]:
-        """Assemble FAQ page.
+        """Assemble FAQ page with batched answer generation.
         
         Args:
             product: ProductData instance
@@ -41,9 +42,11 @@ class PageAssemblyAgent:
         """
         logger.info(f"Assembling FAQ page for {product.product_name}")
         
+        # Batch generate all answers in a single LLM call for efficiency
+        answers = self._generate_answers_batch(product, questions)
+        
         faq_items = []
-        for question in questions:
-            answer = self._generate_answer(product, question.question)
+        for question, answer in zip(questions, answers):
             faq_items.append({
                 "question": question.question,
                 "answer": answer,
@@ -171,17 +174,25 @@ class PageAssemblyAgent:
         logger.info("Assembled comparison page successfully")
         return page_data
     
-    def _generate_answer(self, product: ProductData, question: str) -> str:
-        """Generate answer to a question using LLM.
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=2, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        retry=retry_if_exception_type((APIError, APITimeoutError, RateLimitError)),
+        reraise=True
+    )
+    def _generate_answers_batch(self, product: ProductData, questions: List[Question]) -> List[str]:
+        """Generate answers to multiple questions in a single batched LLM call.
         
         Args:
             product: ProductData instance
-            question: Question text
+            questions: List of Question objects
             
         Returns:
-            Answer text
+            List of answer strings
         """
-        prompt = f"""Answer this question about the product based ONLY on the provided product information.
+        questions_text = "\n".join([f"{i+1}. {q.question}" for i, q in enumerate(questions)])
+        
+        prompt = f"""Answer ALL of the following questions about the product based ONLY on the provided product information.
 Do not add any information not present in the product data.
 
 Product Information:
@@ -194,9 +205,19 @@ Product Information:
 - Side Effects: {product.side_effects}
 - Price: {product.price}
 
-Question: {question}
+Questions:
+{questions_text}
 
-Provide a concise, helpful answer (2-3 sentences maximum)."""
+Provide answers in JSON format with this structure:
+{{
+  "answers": [
+    "Answer to question 1 (2-3 sentences)",
+    "Answer to question 2 (2-3 sentences)",
+    ...
+  ]
+}}
+
+Ensure you provide exactly {len(questions)} answers in the same order as the questions."""
 
         try:
             response = self.client.chat.completions.create(
@@ -206,16 +227,37 @@ Provide a concise, helpful answer (2-3 sentences maximum)."""
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.5,
-                max_tokens=150
+                response_format={"type": "json_object"}
             )
             
-            return response.choices[0].message.content.strip()
+            import json
+            result = json.loads(response.choices[0].message.content)
+            answers = result.get("answers", [])
+            
+            # Validate we got the right number of answers
+            if len(answers) != len(questions):
+                logger.warning(f"Expected {len(questions)} answers but got {len(answers)}. Padding with defaults.")
+                while len(answers) < len(questions):
+                    answers.append("Information not available.")
+            
+            return answers[:len(questions)]  # Ensure we return exactly the right number
+            
+        except (APIError, APITimeoutError, RateLimitError) as e:
+            logger.error(f"OpenAI API error during FAQ generation: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Failed to generate answer: {str(e)}")
-            return "Information not available."
+            logger.error(f"Failed to generate batched answers: {str(e)}")
+            # Fallback: return default answers
+            return ["Information not available." for _ in questions]
     
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=2, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        retry=retry_if_exception_type((APIError, APITimeoutError, RateLimitError)),
+        reraise=True
+    )
     def _generate_recommendation(self, product_a: ProductData, product_b: ProductData) -> str:
-        """Generate recommendation based on comparison.
+        """Generate recommendation based on comparison with retry logic.
         
         Args:
             product_a: First product
@@ -251,6 +293,9 @@ Product B: {product_b.product_name}
             )
             
             return response.choices[0].message.content.strip()
+        except (APIError, APITimeoutError, RateLimitError) as e:
+            logger.error(f"OpenAI API error during recommendation generation: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to generate recommendation: {str(e)}")
             return "Both products have their unique benefits. Choose based on your specific skin needs."

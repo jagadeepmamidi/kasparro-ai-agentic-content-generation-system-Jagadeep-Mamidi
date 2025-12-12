@@ -2,10 +2,11 @@
 
 from typing import List
 import json
-from openai import OpenAI
+from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from src.schemas import ProductData, Question
-from src.config import OPENAI_API_KEY, OPENAI_MODEL, QUESTION_CATEGORIES, MIN_QUESTIONS_PER_CATEGORY
+from src.config import OPENAI_API_KEY, OPENAI_MODEL, QUESTION_CATEGORIES, MIN_QUESTIONS_PER_CATEGORY, MAX_RETRIES, RETRY_MIN_WAIT, RETRY_MAX_WAIT
 from src.utils import setup_logging
 
 logger = setup_logging(__name__)
@@ -25,8 +26,14 @@ class QuestionGeneratorAgent:
         self.model = OPENAI_MODEL
         logger.info("QuestionGeneratorAgent initialized")
     
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=2, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        retry=retry_if_exception_type((APIError, APITimeoutError, RateLimitError)),
+        reraise=True
+    )
     def generate_questions(self, product: ProductData) -> List[Question]:
-        """Generate categorized questions from product data.
+        """Generate categorized questions from product data with retry logic.
         
         Args:
             product: ProductData instance
@@ -71,6 +78,9 @@ class QuestionGeneratorAgent:
             
             return questions
             
+        except (APIError, APITimeoutError, RateLimitError) as e:
+            logger.error(f"OpenAI API error during question generation: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Failed to generate questions: {str(e)}")
             raise

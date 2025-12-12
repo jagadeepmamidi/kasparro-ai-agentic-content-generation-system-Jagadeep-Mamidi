@@ -17,7 +17,13 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL = "gpt-4o-mini"  # Cost-efficient model for content generation
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Configurable model with fallback
+
+# Retry Configuration
+MAX_RETRIES = 3
+RETRY_BACKOFF_MULTIPLIER = 2  # Exponential backoff: 1s, 2s, 4s
+RETRY_MIN_WAIT = 1  # Minimum wait time in seconds
+RETRY_MAX_WAIT = 10  # Maximum wait time in seconds
 
 # Question Generation Configuration
 MIN_QUESTIONS_PER_CATEGORY = 3

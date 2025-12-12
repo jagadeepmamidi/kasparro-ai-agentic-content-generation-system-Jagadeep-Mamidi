@@ -1,6 +1,7 @@
 """Data Parser Agent - Converts raw product data into structured ProductData schema."""
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
+from pydantic import ValidationError
 from src.schemas import ProductData
 from src.utils import setup_logging
 
@@ -19,6 +20,19 @@ class DataParserAgent:
         """Initialize the Data Parser Agent."""
         logger.info("DataParserAgent initialized")
     
+    def _parse_list_field(self, value: Union[str, List[str]]) -> List[str]:
+        """Parse a field that can be either a string or list into a list.
+        
+        Args:
+            value: String (comma-separated) or list
+            
+        Returns:
+            List of strings
+        """
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(',')]
+        return value
+    
     def parse(self, raw_data: Dict[str, Any]) -> ProductData:
         """Parse raw product data into structured schema.
         
@@ -34,15 +48,17 @@ class DataParserAgent:
         logger.info(f"Parsing product data: {raw_data.get('product_name', 'Unknown')}")
         
         try:
-            if isinstance(raw_data.get('skin_type'), str):
-                raw_data['skin_type'] = [s.strip() for s in raw_data['skin_type'].split(',')]
+            # Normalize list fields
+            if 'skin_type' in raw_data:
+                raw_data['skin_type'] = self._parse_list_field(raw_data['skin_type'])
             
-            if isinstance(raw_data.get('key_ingredients'), str):
-                raw_data['key_ingredients'] = [i.strip() for i in raw_data['key_ingredients'].split(',')]
+            if 'key_ingredients' in raw_data:
+                raw_data['key_ingredients'] = self._parse_list_field(raw_data['key_ingredients'])
             
-            if isinstance(raw_data.get('benefits'), str):
-                raw_data['benefits'] = [b.strip() for b in raw_data['benefits'].split(',')]
+            if 'benefits' in raw_data:
+                raw_data['benefits'] = self._parse_list_field(raw_data['benefits'])
             
+            # Handle field name variations
             if 'how_to_use' in raw_data:
                 raw_data['usage_instructions'] = raw_data.pop('how_to_use')
             
@@ -51,6 +67,9 @@ class DataParserAgent:
             logger.info(f"Successfully parsed product: {product.product_name}")
             return product
             
+        except ValidationError as e:
+            logger.error(f"Pydantic validation failed: {e}")
+            raise ValueError(f"Invalid product data - validation errors: {e}")
         except Exception as e:
             logger.error(f"Failed to parse product data: {str(e)}")
             raise ValueError(f"Invalid product data: {str(e)}")

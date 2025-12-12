@@ -1,0 +1,46 @@
+{
+  "page_type": "product",
+  "product_name": "GlowBoost Vitamin C Serum",
+  "sections": {
+    "overview": {
+      "product_name": "GlowBoost Vitamin C Serum",
+      "concentration": "10% Vitamin C",
+      "price": "₹699",
+      "description": "Premium skincare solution for Oily, Combination skin types."
+    },
+    "benefits": {
+      "title": "Key Benefits",
+      "items": [
+        "Brightening",
+        "Fades dark spots"
+      ],
+      "description": "GlowBoost Vitamin C Serum offers multiple benefits for your skin."
+    },
+    "ingredients": {
+      "title": "Key Ingredients",
+      "ingredients": [
+        "Vitamin C",
+        "Hyaluronic Acid"
+      ],
+      "concentration": "10% Vitamin C"
+    },
+    "usage": {
+      "title": "How to Use",
+      "instructions": "Apply 2–3 drops in the morning before sunscreen",
+      "tips": "For best results, use consistently as part of your skincare routine."
+    },
+    "safety": {
+      "title": "Safety Information",
+      "side_effects": "Mild tingling for sensitive skin",
+      "precautions": "Perform a patch test before first use. Discontinue if irritation occurs."
+    },
+    "skin_type": {
+      "title": "Suitable For",
+      "skin_types": [
+        "Oily",
+        "Combination"
+      ],
+      "description": "Formulated for Oily, Combination skin types."
+    }
+  }
+}

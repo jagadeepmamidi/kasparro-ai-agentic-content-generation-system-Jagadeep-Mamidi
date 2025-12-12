@@ -5,11 +5,46 @@ import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from src.config import LOG_LEVEL, LOG_FORMAT
+# Global flag to ensure logging is configured only once
+_logging_configured = False
 
 
+def configure_logging() -> None:
+    """Configure logging for the entire application.
+    
+    Should be called once at application startup.
+    """
+    global _logging_configured
+    
+    if _logging_configured:
+        return
+    
+    from src.config import LOG_LEVEL, LOG_FORMAT
+    
+    logging.basicConfig(
+        level=LOG_LEVEL,
+        format=LOG_FORMAT,
+        handlers=[logging.StreamHandler()]
+    )
+    
+    _logging_configured = True
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Get a logger instance for a module.
+    
+    Args:
+        name: Module name
+        
+    Returns:
+        Logger instance
+    """
+    return logging.getLogger(name)
+
+
+# Backward compatibility - deprecated, use get_logger instead
 def setup_logging(name: str) -> logging.Logger:
-    """Set up logging for a module.
+    """Set up logging for a module (deprecated - use get_logger).
     
     Args:
         name: Name of the logger (typically __name__)
@@ -17,15 +52,7 @@ def setup_logging(name: str) -> logging.Logger:
     Returns:
         Configured logger instance
     """
-    logger = logging.getLogger(name)
-    logger.setLevel(LOG_LEVEL)
-    
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter(LOG_FORMAT))
-        logger.addHandler(handler)
-    
-    return logger
+    return get_logger(name)
 
 
 def save_json(data: Dict[str, Any], filepath: Path) -> None:
@@ -52,14 +79,4 @@ def load_json(filepath: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-def validate_json_structure(data: Dict[str, Any], required_fields: list[str]) -> bool:
-    """Validate that JSON has required fields.
-    
-    Args:
-        data: Dictionary to validate
-        required_fields: List of required field names
-        
-    Returns:
-        True if all required fields present
-    """
-    return all(field in data for field in required_fields)
+

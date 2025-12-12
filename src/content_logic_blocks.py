@@ -104,13 +104,12 @@ def generate_skin_type_block(product: ProductData, **kwargs) -> ContentBlock:
     )
 
 
-def compare_ingredients_block(product_a: ProductData, product_b: ProductData, **kwargs) -> ContentBlock:
+def compare_ingredients_block(product_a: ProductData, product_b: ProductData) -> ContentBlock:
     """Compare ingredients between two products.
     
     Args:
         product_a: First product
         product_b: Second product
-        **kwargs: Additional parameters
         
     Returns:
         ContentBlock with ingredient comparison
@@ -138,13 +137,12 @@ def compare_ingredients_block(product_a: ProductData, product_b: ProductData, **
     )
 
 
-def compare_benefits_block(product_a: ProductData, product_b: ProductData, **kwargs) -> ContentBlock:
+def compare_benefits_block(product_a: ProductData, product_b: ProductData) -> ContentBlock:
     """Compare benefits between two products.
     
     Args:
         product_a: First product
         product_b: Second product
-        **kwargs: Additional parameters
         
     Returns:
         ContentBlock with benefits comparison
@@ -172,13 +170,12 @@ def compare_benefits_block(product_a: ProductData, product_b: ProductData, **kwa
     )
 
 
-def compare_price_block(product_a: ProductData, product_b: ProductData, **kwargs) -> ContentBlock:
+def compare_price_block(product_a: ProductData, product_b: ProductData) -> ContentBlock:
     """Compare prices between two products.
     
     Args:
         product_a: First product
         product_b: Second product
-        **kwargs: Additional parameters
         
     Returns:
         ContentBlock with price comparison

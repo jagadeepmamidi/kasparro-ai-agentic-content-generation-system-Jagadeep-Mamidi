@@ -25,7 +25,7 @@ The assignment requires building a **modular, multi-agent automation system** th
 
 ## Solution Overview
 
-The system implements a **6-agent pipeline** using a **Directed Acyclic Graph (DAG)** orchestration pattern. Each agent has a single responsibility and explicit input/output contracts, ensuring modularity and extensibility.
+The system implements a **7-agent pipeline** using **LangGraph framework** for graph-based orchestration. Each agent has a single responsibility and explicit input/output contracts, ensuring modularity and extensibility.
 
 ### High-Level Flow
 
@@ -46,11 +46,11 @@ JSON Output Files (faq.json, product_page.json, comparison_page.json)
 
 ### Core Components
 
-1. **Agents (6)**: Specialized workers with single responsibilities
+1. **Agents (7)**: Specialized workers with single responsibilities
 2. **Content Logic Blocks (8)**: Pure functions for data transformation
 3. **Templates (3)**: Structural definitions for pages
 4. **Schemas**: Pydantic models for validation
-5. **Orchestrator**: DAG coordinator managing data flow
+5. **LangGraph Orchestrator**: State graph coordinator managing workflow
 
 ---
 
@@ -222,27 +222,46 @@ The system uses **6 specialized agents**, each with a single, well-defined respo
 
 ---
 
-#### 6. OrchestratorAgent
+#### 6. ProductGeneratorAgent
 
-**Responsibility:** Coordinate entire pipeline execution
+**Responsibility:** Generate fictional competitor products using LLM
 
-**Input:** Raw product data, optional Product B data
+**Input:** `ProductData` (Product A)
+
+**Output:** `ProductData` (Product B)
+
+**Logic:**
+- Uses OpenAI LLM to synthesize realistic competitor product
+- Generates product based on Product A's characteristics
+- Ensures different but comparable product attributes
+- Validates output with Pydantic schema
+
+**Dependencies:** OpenAI API
+
+---
+
+#### 7. LangGraphOrchestrator
+
+**Responsibility:** Coordinate entire pipeline execution using LangGraph framework
+
+**Input:** Raw product data
 
 **Output:** Dictionary mapping page types to file paths
 
 **Logic:**
-- Executes agents in DAG order:
+- Builds state graph with 7 nodes:
   1. Parse Product A
-  2. Parse Product B (fictional)
-  3. Generate questions
+  2. Generate Product B (LLM)
+  3. Generate questions (LLM)
   4. Assemble FAQ page
   5. Assemble Product page
   6. Assemble Comparison page
-- Manages data flow between agents
-- Writes JSON outputs to files
-- Logs progress and errors
+  7. Save outputs
+- Manages state across all nodes
+- Handles errors and retries
+- Executes graph workflow
 
-**Dependencies:** All other agents
+**Dependencies:** All other agents, LangGraph framework
 
 ---
 
@@ -267,7 +286,7 @@ graph TD
     D -->|Product data| I[product_page.json]
     D -->|Comparison data| J[comparison_page.json]
     
-    K[OrchestratorAgent] -.coordinates.-> B
+    K[LangGraphOrchestrator] -.coordinates.-> B
     K -.coordinates.-> C
     K -.coordinates.-> D
 ```
@@ -441,7 +460,8 @@ Parse Product A           Parse Product B
 | ContentLogicEngine | Block name, ProductData | ContentBlock | None | Yes |
 | TemplateEngine | Template name | Template structure | None | Yes |
 | PageAssemblyAgent | Template, ProductData, Questions | Page dict | OpenAI, ContentLogicEngine, TemplateEngine | No |
-| OrchestratorAgent | Raw dict | File paths | All agents | No |
+| ProductGeneratorAgent | ProductData | ProductData | OpenAI | No |
+| LangGraphOrchestrator | Raw dict | File paths | All agents | No |
 
 ---
 
@@ -493,15 +513,16 @@ Parse Product A           Parse Product B
 
 ## Key Design Decisions
 
-### 1. Why DAG Orchestration?
+### 1. Why LangGraph Framework?
 
-**Rationale:** DAG (Directed Acyclic Graph) provides:
-- Clear execution order
-- Dependency management
-- Parallelization opportunities
-- Easy to visualize and debug
+**Rationale:** LangGraph provides:
+- True graph-based workflow execution
+- State management across nodes
+- Built-in error handling and retry mechanisms
+- Industry-standard orchestration pattern
+- Better than custom sequential scripts
 
-**Alternative Considered:** Event-driven architecture (rejected due to complexity for this use case)
+**Alternative Considered:** Custom DAG implementation (rejected - reinventing the wheel)
 
 ### 2. Why Pydantic for Schemas?
 
@@ -582,15 +603,14 @@ self.templates["new"] = NewTemplate
 
 ## Performance Considerations
 
-- **LLM Calls:** 16-20 API calls per pipeline run (1 for questions, 15+ for answers, 1 for recommendation)
-- **Execution Time:** ~30-60 seconds (depends on OpenAI API latency)
-- **Cost:** ~$0.05-0.10 per run (using gpt-4o-mini)
+- **LLM Calls:** 3-4 API calls per pipeline run (1 for Product B, 1 for questions, 1 batched for FAQ answers, 1 for recommendation)
+- **Execution Time:** ~20-40 seconds (depends on OpenAI API latency)
+- **Cost:** ~$0.02-0.05 per run (using gpt-4o-mini)
 
-**Optimization Opportunities:**
-- Batch LLM calls for answers
-- Cache common responses
-- Parallelize page assembly
-- Use cheaper models for simple tasks
+**Optimizations Implemented:**
+- Batched FAQ answer generation (15+ calls -> 1 call)
+- Retry logic for transient failures
+- Efficient state management with LangGraph
 
 ---
 

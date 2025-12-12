@@ -1,0 +1,123 @@
+{
+  "page_type": "comparison",
+  "products": {
+    "product_a": {
+      "name": "GlowBoost Vitamin C Serum",
+      "ingredients": [
+        "Vitamin C",
+        "Hyaluronic Acid"
+      ],
+      "benefits": [
+        "Brightening",
+        "Fades dark spots"
+      ],
+      "price": "₹699",
+      "skin_type": [
+        "Oily",
+        "Combination"
+      ]
+    },
+    "product_b": {
+      "name": "Radiance Restore Niacinamide Serum",
+      "ingredients": [
+        "Niacinamide",
+        "Hyaluronic Acid",
+        "Licorice Root Extract"
+      ],
+      "benefits": [
+        "Balances skin moisture",
+        "Reduces redness and irritation",
+        "Improves skin texture"
+      ],
+      "price": "₹629",
+      "skin_type": [
+        "Dry",
+        "Sensitive",
+        "Combination"
+      ]
+    }
+  },
+  "comparisons": {
+    "ingredients": {
+      "title": "Ingredient Comparison",
+      "product_a": {
+        "name": "GlowBoost Vitamin C Serum",
+        "ingredients": [
+          "Vitamin C",
+          "Hyaluronic Acid"
+        ],
+        "unique": [
+          "Vitamin C"
+        ]
+      },
+      "product_b": {
+        "name": "Radiance Restore Niacinamide Serum",
+        "ingredients": [
+          "Niacinamide",
+          "Hyaluronic Acid",
+          "Licorice Root Extract"
+        ],
+        "unique": [
+          "Niacinamide",
+          "Licorice Root Extract"
+        ]
+      },
+      "common_ingredients": [
+        "Hyaluronic Acid"
+      ]
+    },
+    "benefits": {
+      "title": "Benefits Comparison",
+      "product_a": {
+        "name": "GlowBoost Vitamin C Serum",
+        "benefits": [
+          "Brightening",
+          "Fades dark spots"
+        ],
+        "unique": [
+          "Brightening",
+          "Fades dark spots"
+        ]
+      },
+      "product_b": {
+        "name": "Radiance Restore Niacinamide Serum",
+        "benefits": [
+          "Balances skin moisture",
+          "Reduces redness and irritation",
+          "Improves skin texture"
+        ],
+        "unique": [
+          "Reduces redness and irritation",
+          "Balances skin moisture",
+          "Improves skin texture"
+        ]
+      },
+      "common_benefits": []
+    },
+    "price": {
+      "title": "Price Comparison",
+      "product_a": {
+        "name": "GlowBoost Vitamin C Serum",
+        "price": "₹699"
+      },
+      "product_b": {
+        "name": "Radiance Restore Niacinamide Serum",
+        "price": "₹629"
+      },
+      "analysis": "GlowBoost Vitamin C Serum is priced at ₹699 while Radiance Restore Niacinamide Serum is priced at ₹629."
+    },
+    "skin_types": {
+      "product_a": [
+        "Oily",
+        "Combination"
+      ],
+      "product_b": [
+        "Dry",
+        "Sensitive",
+        "Combination"
+      ],
+      "analysis": "GlowBoost Vitamin C Serum suits Oily, Combination skin, while Radiance Restore Niacinamide Serum suits Dry, Sensitive, Combination skin."
+    }
+  },
+  "recommendation": "For those with oily or combination skin looking to brighten their complexion and fade dark spots, Product A: GlowBoost Vitamin C Serum would be a suitable option due to its targeted benefits. Conversely, Product B: Radiance Restore Niacinamide Serum is ideal for individuals with dry or sensitive skin, as it focuses on moisture balance, reducing redness, and improving overall skin texture. Both products are affordably priced and cater to different skin needs effectively."
+}
