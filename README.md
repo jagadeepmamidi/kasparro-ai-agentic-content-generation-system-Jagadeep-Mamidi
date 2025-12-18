@@ -8,13 +8,18 @@ This system demonstrates engineering-focused automation using a **LangGraph-base
 
 **Key Features:**
 - **LangGraph Framework** for graph-based workflow orchestration
+- **Parallel Page Assembly** - FAQ, Product, and Comparison pages built concurrently
 - 7 Specialized Agents with clear boundaries and responsibilities
 - **LLM-Generated Competitor Products** (no hardcoded data)
+- **Centralized Prompt Management** via `src/prompts.py`
+- **Robust Q&A Matching** with fuzzy text alignment (handles LLM reordering)
 - State Graph Orchestration with error handling and retry logic
 - 8 Reusable Content Logic Blocks for modular content generation
 - 3 Custom Templates (FAQ, Product, Comparison)
 - Pydantic Schemas for data validation
 - **Batched LLM Calls** for efficiency
+- **Output Sanitization** - handles markdown fences in LLM responses
+- **Fail-Fast Configuration** - errors immediately on missing API key
 - Comprehensive Test Suite with mocked LLM responses
 - Machine-Readable JSON Output
 
@@ -52,20 +57,21 @@ kasparro/
 ├── src/
 │   ├── agents/
 │   │   ├── data_parser_agent.py
-│   │   ├── product_generator_agent.py      # NEW: LLM-based competitor generation
+│   │   ├── product_generator_agent.py      # LLM-based competitor generation
 │   │   ├── question_generator_agent.py
 │   │   ├── content_logic_engine.py
 │   │   ├── template_engine.py
 │   │   ├── page_assembly_agent.py
-│   │   └── langgraph_orchestrator.py       # NEW: LangGraph-based orchestration
+│   │   └── langgraph_orchestrator.py       # Parallel graph orchestration
 │   ├── templates/
 │   │   ├── faq_template.py
 │   │   ├── product_template.py
 │   │   └── comparison_template.py
+│   ├── prompts.py                          # Centralized LLM prompts
 │   ├── schemas.py
 │   ├── content_logic_blocks.py
-│   ├── config.py
-│   └── utils.py
+│   ├── config.py                           # Fail-fast API key validation
+│   └── utils.py                            # Includes parse_llm_json helper
 ├── output/
 │   ├── faq.json
 │   ├── product_page.json
@@ -225,7 +231,9 @@ Comprehensive system documentation is available in `docs/projectdocumentation.md
 3. **Reusability**: Content logic blocks are pure functions
 4. **Extensibility**: Easy to add new templates or content blocks
 5. **Validation**: Pydantic schemas ensure data integrity
-6. **Orchestration**: DAG pattern for automated workflow
+6. **Orchestration**: Parallel DAG pattern for automated workflow
+7. **Fail-Fast**: No silent failures or fallback text - errors propagate immediately
+8. **Centralized Prompts**: All LLM prompts in `src/prompts.py` for easy versioning
 
 ## Technology Stack
 

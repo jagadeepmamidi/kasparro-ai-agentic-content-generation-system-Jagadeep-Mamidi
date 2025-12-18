@@ -611,6 +611,10 @@ self.templates["new"] = NewTemplate
 - Batched FAQ answer generation (15+ calls -> 1 call)
 - Retry logic for transient failures
 - Efficient state management with LangGraph
+- **Parallel page assembly** - FAQ, Product, Comparison pages built concurrently
+- **Centralized prompts** - All LLM prompts in `src/prompts.py` for easy versioning
+- **Robust Q&A matching** - Fuzzy text alignment handles LLM reordering
+- **Output sanitization** - `parse_llm_json` strips markdown fences from responses
 
 ---
 
@@ -626,8 +630,9 @@ self.templates["new"] = NewTemplate
 ## Error Handling
 
 - **Invalid Input:** DataParserAgent raises `ValueError`
-- **LLM Failures:** Graceful degradation with default responses
+- **LLM Failures:** Fail-fast with clear error messages (no silent fallbacks)
 - **Missing Fields:** Pydantic validation errors
-- **Template Mismatch:** TemplateEngine validation warnings
+- **Template Mismatch:** TemplateEngine raises `ValueError` if validation fails
+- **Missing API Key:** RuntimeError raised immediately at startup
 
 All errors logged with context for debugging.
