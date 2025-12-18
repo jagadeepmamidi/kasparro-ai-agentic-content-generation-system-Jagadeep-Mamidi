@@ -18,22 +18,22 @@
       ]
     },
     "product_b": {
-      "name": "Radiance Restore Niacinamide Serum",
+      "name": "Radiance Revive Niacinamide Essence",
       "ingredients": [
         "Niacinamide",
         "Hyaluronic Acid",
-        "Licorice Root Extract"
+        "Willow Bark Extract"
       ],
       "benefits": [
-        "Balances skin moisture",
-        "Reduces redness and irritation",
+        "Hydrates",
+        "Reduces redness",
         "Improves skin texture"
       ],
-      "price": "₹629",
+      "price": "₹599",
       "skin_type": [
+        "Normal",
         "Dry",
-        "Sensitive",
-        "Combination"
+        "Sensitive"
       ]
     }
   },
@@ -51,15 +51,15 @@
         ]
       },
       "product_b": {
-        "name": "Radiance Restore Niacinamide Serum",
+        "name": "Radiance Revive Niacinamide Essence",
         "ingredients": [
           "Niacinamide",
           "Hyaluronic Acid",
-          "Licorice Root Extract"
+          "Willow Bark Extract"
         ],
         "unique": [
           "Niacinamide",
-          "Licorice Root Extract"
+          "Willow Bark Extract"
         ]
       },
       "common_ingredients": [
@@ -75,20 +75,20 @@
           "Fades dark spots"
         ],
         "unique": [
-          "Brightening",
-          "Fades dark spots"
+          "Fades dark spots",
+          "Brightening"
         ]
       },
       "product_b": {
-        "name": "Radiance Restore Niacinamide Serum",
+        "name": "Radiance Revive Niacinamide Essence",
         "benefits": [
-          "Balances skin moisture",
-          "Reduces redness and irritation",
+          "Hydrates",
+          "Reduces redness",
           "Improves skin texture"
         ],
         "unique": [
-          "Reduces redness and irritation",
-          "Balances skin moisture",
+          "Hydrates",
+          "Reduces redness",
           "Improves skin texture"
         ]
       },
@@ -101,10 +101,10 @@
         "price": "₹699"
       },
       "product_b": {
-        "name": "Radiance Restore Niacinamide Serum",
-        "price": "₹629"
+        "name": "Radiance Revive Niacinamide Essence",
+        "price": "₹599"
       },
-      "analysis": "GlowBoost Vitamin C Serum is priced at ₹699 while Radiance Restore Niacinamide Serum is priced at ₹629."
+      "analysis": "GlowBoost Vitamin C Serum is priced at ₹699 while Radiance Revive Niacinamide Essence is priced at ₹599."
     },
     "skin_types": {
       "product_a": [
@@ -112,12 +112,12 @@
         "Combination"
       ],
       "product_b": [
+        "Normal",
         "Dry",
-        "Sensitive",
-        "Combination"
+        "Sensitive"
       ],
-      "analysis": "GlowBoost Vitamin C Serum suits Oily, Combination skin, while Radiance Restore Niacinamide Serum suits Dry, Sensitive, Combination skin."
+      "analysis": "GlowBoost Vitamin C Serum suits Oily, Combination skin, while Radiance Revive Niacinamide Essence suits Normal, Dry, Sensitive skin."
     }
   },
-  "recommendation": "For those with oily or combination skin looking to brighten their complexion and fade dark spots, Product A: GlowBoost Vitamin C Serum would be a suitable option due to its targeted benefits. Conversely, Product B: Radiance Restore Niacinamide Serum is ideal for individuals with dry or sensitive skin, as it focuses on moisture balance, reducing redness, and improving overall skin texture. Both products are affordably priced and cater to different skin needs effectively."
+  "recommendation": "For those with oily or combination skin looking to brighten their complexion and fade dark spots, Product A, the GlowBoost Vitamin C Serum, would be the better choice due to its high Vitamin C content. Conversely, Product B, the Radiance Revive Niacinamide Essence, is more suitable for normal, dry, or sensitive skin types, as it provides hydration, reduces redness, and improves skin texture, making it ideal for those with sensitivity or dryness. Overall, choose based on your specific skin type and desired benefits."
 }

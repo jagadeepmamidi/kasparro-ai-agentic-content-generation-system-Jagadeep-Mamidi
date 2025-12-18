@@ -61,7 +61,7 @@ class PageAssemblyAgent:
         }
         
         if not self.template_engine.validate_data("faq", page_data):
-            logger.warning("FAQ page data failed template validation")
+            raise ValueError("FAQ page data failed template validation - cannot proceed with invalid data")
         
         logger.info(f"Assembled FAQ page with {len(faq_items)} items")
         return page_data
@@ -102,7 +102,7 @@ class PageAssemblyAgent:
         }
         
         if not self.template_engine.validate_data("product", page_data):
-            logger.warning("Product page data failed template validation")
+            raise ValueError("Product page data failed template validation - cannot proceed with invalid data")
         
         logger.info("Assembled product page successfully")
         return page_data
@@ -169,7 +169,7 @@ class PageAssemblyAgent:
         }
         
         if not self.template_engine.validate_data("comparison", page_data):
-            logger.warning("Comparison page data failed template validation")
+            raise ValueError("Comparison page data failed template validation - cannot proceed with invalid data")
         
         logger.info("Assembled comparison page successfully")
         return page_data
@@ -183,72 +183,79 @@ class PageAssemblyAgent:
     def _generate_answers_batch(self, product: ProductData, questions: List[Question]) -> List[str]:
         """Generate answers to multiple questions in a single batched LLM call.
         
+        Uses robust matching to align answers with questions even if LLM reorders them.
+        
         Args:
             product: ProductData instance
             questions: List of Question objects
             
         Returns:
-            List of answer strings
+            List of answer strings aligned with input questions
         """
-        questions_text = "\n".join([f"{i+1}. {q.question}" for i, q in enumerate(questions)])
+        from src.prompts import get_faq_answering_prompt, SYS_FAQ_ANSWERING
+        from src.utils import parse_llm_json
         
-        prompt = f"""Answer ALL of the following questions about the product based ONLY on the provided product information.
-Do not add any information not present in the product data.
-
-Product Information:
-- Name: {product.product_name}
-- Concentration: {product.concentration}
-- Skin Types: {', '.join(product.skin_type)}
-- Key Ingredients: {', '.join(product.key_ingredients)}
-- Benefits: {', '.join(product.benefits)}
-- Usage: {product.usage_instructions}
-- Side Effects: {product.side_effects}
-- Price: {product.price}
-
-Questions:
-{questions_text}
-
-Provide answers in JSON format with this structure:
-{{
-  "answers": [
-    "Answer to question 1 (2-3 sentences)",
-    "Answer to question 2 (2-3 sentences)",
-    ...
-  ]
-}}
-
-Ensure you provide exactly {len(questions)} answers in the same order as the questions."""
+        prompt = get_faq_answering_prompt(product, questions)
 
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful skincare product expert. Answer questions based only on the provided product information."},
+                    {"role": "system", "content": SYS_FAQ_ANSWERING},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.5,
                 response_format={"type": "json_object"}
             )
             
-            import json
-            result = json.loads(response.choices[0].message.content)
-            answers = result.get("answers", [])
+            result = parse_llm_json(response.choices[0].message.content)
+            qa_pairs = result.get("qa_pairs", [])
             
-            # Validate we got the right number of answers
-            if len(answers) != len(questions):
-                logger.warning(f"Expected {len(questions)} answers but got {len(answers)}. Padding with defaults.")
-                while len(answers) < len(questions):
-                    answers.append("Information not available.")
+            # Map question text to answer for robust O(1) lookup
+            # Normalize keys by stripping whitespace and lowering case for fuzzy-strict matching
+            answer_map = {item["question"].strip().lower(): item["answer"] for item in qa_pairs}
             
-            return answers[:len(questions)]  # Ensure we return exactly the right number
+            final_answers = []
+            missing_questions = []
+            
+            for q in questions:
+                # Try exact match first
+                key = q.question.strip().lower()
+                if key in answer_map:
+                    final_answers.append(answer_map[key])
+                else:
+                    # Fallback: Try to find substring match if exact match fails
+                    # This helps if LLM slightly altered the question text
+                    match_found = False
+                    for k, v in answer_map.items():
+                        if k in key or key in k: # loose substring match
+                            final_answers.append(v)
+                            match_found = True
+                            break
+                    
+                    if not match_found:
+                        missing_questions.append(q.question)
+            
+            # Strict validation: must get answers for all questions
+            if missing_questions:
+                raise ValueError(
+                    f"LLM failed to answer {len(missing_questions)} questions. "
+                    f"Missing: {missing_questions[:3]}..."
+                )
+            
+            if len(final_answers) != len(questions):
+                 raise ValueError(
+                    f"Aligned answer count ({len(final_answers)}) does not match question count ({len(questions)})."
+                )
+
+            return final_answers
             
         except (APIError, APITimeoutError, RateLimitError) as e:
             logger.error(f"OpenAI API error during FAQ generation: {str(e)}")
             raise
         except Exception as e:
             logger.error(f"Failed to generate batched answers: {str(e)}")
-            # Fallback: return default answers
-            return ["Information not available." for _ in questions]
+            raise  # Fail loudly - no fallback allowed
     
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
@@ -266,26 +273,15 @@ Ensure you provide exactly {len(questions)} answers in the same order as the que
         Returns:
             Recommendation text
         """
-        prompt = f"""Compare these two skincare products and provide a brief recommendation (2-3 sentences) 
-about which product might be better for different use cases or skin types.
-
-Product A: {product_a.product_name}
-- Ingredients: {', '.join(product_a.key_ingredients)}
-- Benefits: {', '.join(product_a.benefits)}
-- Skin Types: {', '.join(product_a.skin_type)}
-- Price: {product_a.price}
-
-Product B: {product_b.product_name}
-- Ingredients: {', '.join(product_b.key_ingredients)}
-- Benefits: {', '.join(product_b.benefits)}
-- Skin Types: {', '.join(product_b.skin_type)}
-- Price: {product_b.price}"""
+        from src.prompts import get_recommendation_prompt, SYS_RECOMMENDATION
+        
+        prompt = get_recommendation_prompt(product_a, product_b)
 
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a skincare expert providing product recommendations."},
+                    {"role": "system", "content": SYS_RECOMMENDATION},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.6,
@@ -298,4 +294,4 @@ Product B: {product_b.product_name}
             raise
         except Exception as e:
             logger.error(f"Failed to generate recommendation: {str(e)}")
-            return "Both products have their unique benefits. Choose based on your specific skin needs."
+            raise  # Fail loudly - no fallback allowed

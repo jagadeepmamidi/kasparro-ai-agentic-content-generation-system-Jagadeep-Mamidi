@@ -90,11 +90,12 @@ class TestPageAssemblyAgent:
         
         mock_response = Mock()
         mock_response.choices = [Mock()]
+        # Update mock to return qa_pairs matching sample_questions text
         mock_response.choices[0].message.content = json.dumps({
-            "answers": [
-                "The main benefits are brightening and hydration.",
-                "It may cause mild tingling for sensitive skin.",
-                "Apply daily in the morning before sunscreen."
+            "qa_pairs": [
+                {"question": "What are the benefits?", "answer": "The main benefits are brightening and hydration."},
+                {"question": "Is it safe for sensitive skin?", "answer": "It may cause mild tingling for sensitive skin."},
+                {"question": "How often should I use it?", "answer": "Apply daily in the morning before sunscreen."}
             ]
         })
         mock_client.chat.completions.create.return_value = mock_response
@@ -117,8 +118,13 @@ class TestPageAssemblyAgent:
         
         mock_response = Mock()
         mock_response.choices = [Mock()]
+        # Update mock to return qa_pairs matching sample_questions text
         mock_response.choices[0].message.content = json.dumps({
-            "answers": ["Answer 1", "Answer 2", "Answer 3"]
+            "qa_pairs": [
+                {"question": "What are the benefits?", "answer": "Answer 1"},
+                {"question": "Is it safe for sensitive skin?", "answer": "Answer 2"},
+                {"question": "How often should I use it?", "answer": "Answer 3"}
+            ]
         })
         mock_client.chat.completions.create.return_value = mock_response
         

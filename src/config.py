@@ -17,6 +17,20 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 # OpenAI Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Fail-fast validation for API key (skip during testing when mocks are used)
+import sys
+_is_testing = (
+    os.getenv("PYTEST_CURRENT_TEST") is not None or 
+    "pytest" in sys.modules or
+    os.getenv("TESTING") == "1"
+)
+if not OPENAI_API_KEY and not _is_testing:
+    raise RuntimeError(
+        "OPENAI_API_KEY environment variable is not set. "
+        "Please set it in your .env file or environment before running the pipeline."
+    )
+
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Configurable model with fallback
 
 # Retry Configuration

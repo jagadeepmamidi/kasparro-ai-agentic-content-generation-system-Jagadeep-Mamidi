@@ -1,9 +1,8 @@
 """LangGraph Orchestrator - Graph-based pipeline orchestration using LangGraph framework."""
 
-from typing import Dict, Any, TypedDict, List
+from typing import Dict, Any, TypedDict, List, Literal
 from pathlib import Path
 from langgraph.graph import StateGraph, END
-from pydantic import ValidationError
 
 from src.schemas import ProductData, Question
 from src.agents.data_parser_agent import DataParserAgent
@@ -33,10 +32,9 @@ class LangGraphOrchestrator:
     """LangGraph-based orchestrator for content generation pipeline.
     
     Implements a state graph workflow with:
-    - Dynamic task routing
-    - Error handling and recovery
-    - Conditional execution
-    - State management across nodes
+    - Parallel page assembly (FAQ, Product, Comparison run concurrently)
+    - Explicit upstream error checking in each node
+    - Clean state management across nodes
     """
     
     def __init__(self):
@@ -48,10 +46,15 @@ class LangGraphOrchestrator:
         
         # Build the state graph
         self.graph = self._build_graph()
-        logger.info("LangGraphOrchestrator initialized with state graph")
+        logger.info("LangGraphOrchestrator initialized with parallel graph topology")
     
     def _build_graph(self) -> StateGraph:
         """Build the LangGraph state graph for pipeline execution.
+        
+        Graph topology with parallel page assembly:
+        parse_product_a -> generate_product_b -> generate_questions -> 
+            [assemble_faq, assemble_product, assemble_comparison] (parallel) ->
+            save_outputs -> END
         
         Returns:
             Compiled StateGraph instance
@@ -68,13 +71,20 @@ class LangGraphOrchestrator:
         workflow.add_node("assemble_comparison", self._assemble_comparison_node)
         workflow.add_node("save_outputs", self._save_outputs_node)
         
-        # Define the workflow edges
+        # Define the workflow edges with parallel fan-out for page assembly
         workflow.set_entry_point("parse_product_a")
         workflow.add_edge("parse_product_a", "generate_product_b")
         workflow.add_edge("generate_product_b", "generate_questions")
+        
+        # Fan-out: all three page assembly nodes run after questions are generated
+        # LangGraph will execute these in parallel when possible
         workflow.add_edge("generate_questions", "assemble_faq")
-        workflow.add_edge("assemble_faq", "assemble_product")
-        workflow.add_edge("assemble_product", "assemble_comparison")
+        workflow.add_edge("generate_questions", "assemble_product")
+        workflow.add_edge("generate_questions", "assemble_comparison")
+        
+        # Fan-in: all assembly nodes converge to save_outputs
+        workflow.add_edge("assemble_faq", "save_outputs")
+        workflow.add_edge("assemble_product", "save_outputs")
         workflow.add_edge("assemble_comparison", "save_outputs")
         workflow.add_edge("save_outputs", END)
         
@@ -130,39 +140,52 @@ class LangGraphOrchestrator:
             logger.error(f"\nLangGraph pipeline failed: {str(e)}")
             raise
     
-    # ========== Graph Node Functions ==========
-    
-    def _parse_product_a_node(self, state: PipelineState) -> PipelineState:
-        """Node: Parse Product A data.
+    def _check_upstream_error(self, state: PipelineState, node_name: str) -> bool:
+        """Check if upstream nodes have set an error in state.
         
         Args:
             state: Current pipeline state
+            node_name: Name of the current node (for logging)
             
         Returns:
-            Updated pipeline state
+            True if there's an upstream error, False otherwise
+        """
+        if state.get("error"):
+            logger.warning(f"[NODE: {node_name}] Skipping due to upstream error: {state['error']}")
+            return True
+        return False
+    
+    # ========== Graph Node Functions ==========
+    
+    def _parse_product_a_node(self, state: PipelineState) -> Dict[str, Any]:
+        """Node: Parse Product A data.
+        
+        Returns:
+            Partial state update or None
         """
         logger.info("\n[NODE: parse_product_a] Parsing input product data...")
+        
+        if self._check_upstream_error(state, "parse_product_a"):
+            return {}
         
         try:
             product_a = self.data_parser.parse(state["raw_product_data"])
             logger.info(f"Parsed Product A: {product_a.product_name}")
-            state["product_a"] = product_a
+            return {"product_a": product_a}
         except Exception as e:
             logger.error(f"Failed to parse Product A: {str(e)}")
-            state["error"] = f"Product A parsing failed: {str(e)}"
-        
-        return state
+            return {"error": f"Product A parsing failed: {str(e)}"}
     
-    def _generate_product_b_node(self, state: PipelineState) -> PipelineState:
+    def _generate_product_b_node(self, state: PipelineState) -> Dict[str, Any]:
         """Node: Generate fictional Product B using LLM.
         
-        Args:
-            state: Current pipeline state
-            
         Returns:
-            Updated pipeline state
+            Partial state update
         """
         logger.info("\n[NODE: generate_product_b] Generating competitor product...")
+        
+        if self._check_upstream_error(state, "generate_product_b"):
+            return {}
         
         try:
             if state["product_a"] is None:
@@ -172,50 +195,21 @@ class LangGraphOrchestrator:
             product_b = self.product_generator.generate_product(state["product_a"])
             logger.info(f"Generated Product B: {product_b.product_name}")
             
-            # Store directly as ProductData instance
-            state["product_b"] = product_b
+            return {"product_b": product_b}
         except Exception as e:
             logger.error(f"Failed to generate Product B: {str(e)}")
-            state["error"] = f"Product B generation failed: {str(e)}"
-        
-        return state
+            return {"error": f"Product B generation failed: {str(e)}"}
     
-    def _parse_product_b_node(self, state: PipelineState) -> PipelineState:
-        """Node: Parse generated Product B data.
-        
-        Args:
-            state: Current pipeline state
-            
-        Returns:
-            Updated pipeline state
-        """
-        logger.info("\n[NODE: parse_product_b] Validating generated product...")
-        
-        try:
-            # Product B is already a ProductData instance from generator
-            # Just validate it's present
-            if "raw_product_b_data" in state:
-                product_b = ProductData(**state["raw_product_b_data"])
-                logger.info(f"Validated Product B: {product_b.product_name}")
-                state["product_b"] = product_b
-            else:
-                raise ValueError("Product B data not available")
-        except Exception as e:
-            logger.error(f"Failed to validate Product B: {str(e)}")
-            state["error"] = f"Product B validation failed: {str(e)}"
-        
-        return state
-    
-    def _generate_questions_node(self, state: PipelineState) -> PipelineState:
+    def _generate_questions_node(self, state: PipelineState) -> Dict[str, Any]:
         """Node: Generate FAQ questions.
         
-        Args:
-            state: Current pipeline state
-            
         Returns:
-            Updated pipeline state
+            Partial state update
         """
         logger.info("\n[NODE: generate_questions] Generating FAQ questions...")
+        
+        if self._check_upstream_error(state, "generate_questions"):
+            return {}
         
         try:
             if state["product_a"] is None:
@@ -232,23 +226,21 @@ class LangGraphOrchestrator:
             for category, count in sorted(distribution.items()):
                 logger.info(f"    - {category}: {count}")
             
-            state["questions"] = questions
+            return {"questions": questions}
         except Exception as e:
             logger.error(f"Failed to generate questions: {str(e)}")
-            state["error"] = f"Question generation failed: {str(e)}"
-        
-        return state
+            return {"error": f"Question generation failed: {str(e)}"}
     
-    def _assemble_faq_node(self, state: PipelineState) -> PipelineState:
+    def _assemble_faq_node(self, state: PipelineState) -> Dict[str, Any]:
         """Node: Assemble FAQ page.
         
-        Args:
-            state: Current pipeline state
-            
         Returns:
-            Updated pipeline state
+            Partial state update
         """
         logger.info("\n[NODE: assemble_faq] Assembling FAQ page...")
+        
+        if self._check_upstream_error(state, "assemble_faq"):
+            return {}
         
         try:
             if state["product_a"] is None or state["questions"] is None:
@@ -259,23 +251,21 @@ class LangGraphOrchestrator:
                 state["questions"]
             )
             logger.info(f"Assembled FAQ page with {len(faq_page['faq_items'])} items")
-            state["faq_page"] = faq_page
+            return {"faq_page": faq_page}
         except Exception as e:
             logger.error(f"Failed to assemble FAQ page: {str(e)}")
-            state["error"] = f"FAQ assembly failed: {str(e)}"
-        
-        return state
+            return {"error": f"FAQ assembly failed: {str(e)}"}
     
-    def _assemble_product_node(self, state: PipelineState) -> PipelineState:
+    def _assemble_product_node(self, state: PipelineState) -> Dict[str, Any]:
         """Node: Assemble product page.
         
-        Args:
-            state: Current pipeline state
-            
         Returns:
-            Updated pipeline state
+            Partial state update
         """
         logger.info("\n[NODE: assemble_product] Assembling product page...")
+        
+        if self._check_upstream_error(state, "assemble_product"):
+            return {}
         
         try:
             if state["product_a"] is None:
@@ -283,23 +273,21 @@ class LangGraphOrchestrator:
             
             product_page = self.page_assembler.assemble_product_page(state["product_a"])
             logger.info("Assembled product page")
-            state["product_page"] = product_page
+            return {"product_page": product_page}
         except Exception as e:
             logger.error(f"Failed to assemble product page: {str(e)}")
-            state["error"] = f"Product page assembly failed: {str(e)}"
-        
-        return state
+            return {"error": f"Product page assembly failed: {str(e)}"}
     
-    def _assemble_comparison_node(self, state: PipelineState) -> PipelineState:
+    def _assemble_comparison_node(self, state: PipelineState) -> Dict[str, Any]:
         """Node: Assemble comparison page.
         
-        Args:
-            state: Current pipeline state
-            
         Returns:
-            Updated pipeline state
+            Partial state update
         """
         logger.info("\n[NODE: assemble_comparison] Assembling comparison page...")
+        
+        if self._check_upstream_error(state, "assemble_comparison"):
+            return {}
         
         try:
             if state["product_a"] is None or state["product_b"] is None:
@@ -310,12 +298,10 @@ class LangGraphOrchestrator:
                 state["product_b"]
             )
             logger.info(f"Assembled comparison: {state['product_a'].product_name} vs {state['product_b'].product_name}")
-            state["comparison_page"] = comparison_page
+            return {"comparison_page": comparison_page}
         except Exception as e:
             logger.error(f"Failed to assemble comparison page: {str(e)}")
-            state["error"] = f"Comparison page assembly failed: {str(e)}"
-        
-        return state
+            return {"error": f"Comparison page assembly failed: {str(e)}"}
     
     def _save_outputs_node(self, state: PipelineState) -> PipelineState:
         """Node: Save all output files.
@@ -327,6 +313,9 @@ class LangGraphOrchestrator:
             Updated pipeline state
         """
         logger.info("\n[NODE: save_outputs] Saving output files...")
+        
+        if self._check_upstream_error(state, "save_outputs"):
+            return state
         
         try:
             output_files = {}

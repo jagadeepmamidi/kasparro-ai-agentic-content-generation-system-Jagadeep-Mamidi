@@ -45,7 +45,10 @@ def mock_openai_responses():
             ]
         }),
         "faq_answers": json.dumps({
-            "answers": [f"Answer {i}" for i in range(15)]
+            "qa_pairs": [
+                {"question": f"Question {i}?", "answer": f"Answer {i}"}
+                for i in range(15)
+            ]
         }),
         "recommendation": "Both products are excellent choices for different skin types."
     }

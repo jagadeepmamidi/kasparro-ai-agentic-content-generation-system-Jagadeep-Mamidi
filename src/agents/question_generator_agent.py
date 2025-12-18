@@ -26,24 +26,71 @@ class QuestionGeneratorAgent:
         self.model = OPENAI_MODEL
         logger.info("QuestionGeneratorAgent initialized")
     
-    @retry(
-        stop=stop_after_attempt(MAX_RETRIES),
-        wait=wait_exponential(multiplier=2, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
-        retry=retry_if_exception_type((APIError, APITimeoutError, RateLimitError)),
-        reraise=True
-    )
     def generate_questions(self, product: ProductData) -> List[Question]:
-        """Generate categorized questions from product data with retry logic.
+        """Generate categorized questions from product data with strict count enforcement.
         
         Args:
             product: ProductData instance
             
         Returns:
             List of Question objects (minimum 15)
+            
+        Raises:
+            ValueError: If unable to generate 15+ questions after retries
         """
         logger.info(f"Generating questions for product: {product.product_name}")
         
-        prompt = self._create_prompt(product)
+        questions = self._generate_questions_with_retry(product)
+        logger.info(f"Successfully generated {len(questions)} questions")
+        return questions
+    
+    def _generate_questions_with_retry(self, product: ProductData, max_attempts: int = 3) -> List[Question]:
+        """Generate questions with retry logic for strict count enforcement.
+        
+        Args:
+            product: ProductData instance
+            max_attempts: Maximum number of attempts to get 15+ questions
+            
+        Returns:
+            List of at least 15 Question objects
+            
+        Raises:
+            ValueError: If unable to reach minimum count after all attempts
+        """
+        for attempt in range(1, max_attempts + 1):
+            logger.info(f"Question generation attempt {attempt}/{max_attempts}")
+            questions = self._call_llm_for_questions(product)
+            
+            if len(questions) >= 15:
+                return questions
+            
+            logger.warning(f"Attempt {attempt}: Got {len(questions)} questions, need 15+. Retrying...")
+        
+        # Failed after all attempts - fail loudly
+        raise ValueError(
+            f"Failed to generate minimum 15 questions after {max_attempts} attempts. "
+            f"Last attempt produced only {len(questions)} questions. Cannot proceed."
+        )
+    
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=2, min=RETRY_MIN_WAIT, max=RETRY_MAX_WAIT),
+        retry=retry_if_exception_type((APIError, APITimeoutError, RateLimitError)),
+        reraise=True
+    )
+    def _call_llm_for_questions(self, product: ProductData) -> List[Question]:
+        """Make LLM call to generate questions with API retry logic.
+        
+        Args:
+            product: ProductData instance
+            
+        Returns:
+            List of Question objects (may be less than 15)
+        """
+        from src.prompts import get_question_generation_prompt, SYS_QUESTION_GENERATION
+        from src.utils import parse_llm_json
+        
+        prompt = get_question_generation_prompt(product)
         
         try:
             response = self.client.chat.completions.create(
@@ -51,7 +98,7 @@ class QuestionGeneratorAgent:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert at generating user questions about skincare products. Generate diverse, realistic questions that users would ask."
+                        "content": SYS_QUESTION_GENERATION
                     },
                     {
                         "role": "user",
@@ -62,7 +109,7 @@ class QuestionGeneratorAgent:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response.choices[0].message.content)
+            result = parse_llm_json(response.choices[0].message.content)
             questions = []
             
             for q_data in result.get("questions", []):
@@ -71,11 +118,7 @@ class QuestionGeneratorAgent:
                     category=q_data["category"]
                 ))
             
-            logger.info(f"Generated {len(questions)} questions")
-            
-            if len(questions) < 15:
-                logger.warning(f"Only generated {len(questions)} questions, expected 15+")
-            
+            logger.info(f"LLM returned {len(questions)} questions")
             return questions
             
         except (APIError, APITimeoutError, RateLimitError) as e:
@@ -84,38 +127,3 @@ class QuestionGeneratorAgent:
         except Exception as e:
             logger.error(f"Failed to generate questions: {str(e)}")
             raise
-    
-    def _create_prompt(self, product: ProductData) -> str:
-        """Create prompt for question generation.
-        
-        Args:
-            product: ProductData instance
-            
-        Returns:
-            Formatted prompt string
-        """
-        return f"""Generate at least 15 diverse user questions about the following skincare product. 
-Questions must be categorized into these categories: {', '.join(QUESTION_CATEGORIES)}.
-Ensure at least {MIN_QUESTIONS_PER_CATEGORY} questions per category.
-
-Product Information:
-- Name: {product.product_name}
-- Concentration: {product.concentration}
-- Skin Types: {', '.join(product.skin_type)}
-- Key Ingredients: {', '.join(product.key_ingredients)}
-- Benefits: {', '.join(product.benefits)}
-- Usage: {product.usage_instructions}
-- Side Effects: {product.side_effects}
-- Price: {product.price}
-
-Return a JSON object with this structure:
-{{
-  "questions": [
-    {{"question": "...", "category": "Informational"}},
-    {{"question": "...", "category": "Safety"}},
-    ...
-  ]
-}}
-
-Categories must be one of: {', '.join(QUESTION_CATEGORIES)}
-"""

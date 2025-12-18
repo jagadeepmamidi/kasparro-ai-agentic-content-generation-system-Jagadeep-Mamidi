@@ -79,4 +79,33 @@ def load_json(filepath: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
+def parse_llm_json(content: str) -> Dict[str, Any]:
+    """Parse JSON from LLM output, handling markdown fences.
+    
+    Args:
+        content: Raw LLM output string
+        
+    Returns:
+        Parsed dictionary
+        
+    Raises:
+        json.JSONDecodeError: If parsing fails
+    """
+    clean_content = content.strip()
+    
+    # Strip markdown code blocks if present
+    if clean_content.startswith("```"):
+        # Remove opening fence
+        if clean_content.startswith("```json"):
+            clean_content = clean_content[7:]
+        else:
+            clean_content = clean_content[3:]
+            
+        # Remove closing fence
+        if clean_content.endswith("```"):
+            clean_content = clean_content[:-3]
+    
+    return json.loads(clean_content.strip())
+
+
 
